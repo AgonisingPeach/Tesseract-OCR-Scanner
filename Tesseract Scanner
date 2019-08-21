@@ -1,0 +1,167 @@
+##
+##
+##  Used for Scanning Text On Images
+##
+##
+
+##  Imports
+from colorama import Fore, Style, init, deinit
+import os
+import pytesseract
+from PIL import Image
+
+##  Colors
+init(autoreset=True)
+cW = Fore.WHITE
+cR = Fore.RED + Style.BRIGHT
+cG = Fore.GREEN + Style.BRIGHT
+
+##  METHODS
+
+## Checks for the TesseractPath file
+def checkTess(filename):
+    if os.path.exists('.\DataFiles\\{}'.format(filename)):
+        print('* Found Tesseract Path...')
+        pathData = open('.\DataFiles\\{}'.format(filename)).read()
+        return r"{}".format(pathData)
+    else:
+        print("* ERROR - Tesseract Path File does not exist!\n* Ensure 'TesseractPath.txt' is located inside the 'DataFiles' folder.")
+        input("* Press enter to exit...")
+        os.sys.exit()
+
+## Checks for the BadCharaters file.
+def checkChars(filename):
+    if os.path.exists('.\DataFiles\\{}'.format(filename)):
+        print("* Loading Bad Characters...")
+        file = open('.\DataFiles\\{}'.format(filename)).read()
+        badChars = file.split(',')
+        badChars.append(',')
+        return badChars
+
+    else:
+        print("* ERROR - Bad Characters File does not exist!\n* Ensure 'BadCharacters.txt' is located inside the 'DataFiles' folder.")
+        input("* Press enter to exit...")
+        os.sys.exit()
+
+## Checks for the DirtyWords file.
+def checkDirty(filename):
+    if os.path.exists('.\DataFiles\\{}'.format(filename)):
+        print('* Loading Dirty Words...')
+        file = open('.\DataFiles\\{}'.format(filename)).read()
+        dirtyWords = file.split(',')
+        return dirtyWords
+    else:
+        print("* ERROR - Dirty Words File does not exist!\n* Ensure 'DirtyWords.txt' is located inside the 'DataFiles' folder.")
+        input("* Press enter to exit...")
+        os.sys.exit()
+
+
+## Method for scanning the selected image.
+def ScanImage(image, badChars, dirtyWords):
+    DirtyCount = 0
+    wordsFound = []
+
+    text = pytesseract.image_to_string(image, lang='eng')
+    words = text.split(' ')
+    toScan = []
+
+    ##  Removes any new lines within the elements and makes them uppercase
+    for element in words:
+        ## First checks if newline is in the element. If so split it
+        if "\n" in element:
+            t = element.split('\n')
+            for i in t:
+                # Remove any EOL or NL
+                i = i.rstrip('\r\n')
+                for char in badChars:
+                    # Replace any bad chars with nothing
+                    i = i.replace(char, '')
+                if i == "":
+                    #if the element is empty. Do nothing
+                    pass
+                else:
+                    # Add the element to the final scan list in uppercase.
+                    toScan.append(i.upper())
+        else:
+            # Just remove the bad chars add them to the final scan list. Uppercase too.
+            for char in badChars:
+                element = element.replace(char, '')
+            toScan.append(element.upper())
+
+    ##  Checks for any dirty words in the toScan list
+    for word in toScan:
+        for dirty in dirtyWords:
+            if word == dirty:
+                # Increase the number of dirty words that the program has found in the image.
+                DirtyCount += 1
+                if word not in wordsFound:
+                    # Add the dirty word for the output phase. ['Dirty1', 'Dirty2', etc...]
+                    wordsFound.append(word)
+                else:
+                    continue
+
+
+    # Returns how many dirty words have been found in the picture.
+    print("* Words that were found: {}".format(wordsFound))
+    if DirtyCount > 0:
+        return DirtyCount
+    else:
+        return '0'
+
+##  Main
+def main():
+    print("\n\n----------: TESSERACT OCR IMAGE-TO-TEXT EXTRACTOR :----------\n")
+
+    ## Loads all required files for use in the program.
+        ## Checks and loads the TesseractPath file
+        ## Checks and loads the BadCharacters file
+        ## Checks and loads the DirtyWords file
+    try:
+        pytesseract.pytesseract.tesseract_cmd = checkTess("TesseractPath.txt")
+    except:
+        print("* ERROR - Tesseract is not installed on this computer. Please install Tesseract to use this program.")
+    badChars = checkChars('BadCharacters.txt')
+    dirtyWords = checkDirty('DirtyWords.txt')
+
+    ## Asks for the path of the images you want to scan and makes a list all files in that directory.
+    wd = input("\n* Copy and Paste the folder path to where the images are located:\n* Eg: 'C:\\Users\\Username\\Desktop\\<Folder>'\n* >: ")
+    filesInDir = os.listdir(wd)
+
+
+    ## Loops through everything inside the folder.
+    for image in filesInDir:
+
+        # Tries to scan the file in the folder, if it gets an invalid image type. Skip it
+        try:
+            # Creates the images working directory.
+            fdir = wd + '\\' + image
+            im = Image.open(fdir)
+
+            print("\n----------: Scanning Image: '{}' :----------".format(cG+image+cW))
+
+            ## Scans the Image in its normal state
+            print("\n* Starting RGB Scan")
+            rgbCount = ScanImage(im, badChars, dirtyWords)
+
+            ## Scans the Image in Monochrome for a double check
+            print("\n* Starting Monochrome Scan")
+            mono = im.convert('L')
+            monoCount = ScanImage(mono, badChars, dirtyWords)
+
+            ## This outputs the value of the scan with the best accuracy, if 0, print no words found
+            if rgbCount == '0' and monoCount == '0':
+                print("\n* RESULTS: '{}' Dirty Word(s) found in image: '{}'.".format(cG+rgbCount+cW, cG+image+cW))
+            elif int(monoCount) >= int(rgbCount):
+                print("\n* RESULTS: '{}' Dirty Word(s) found in image: '{}'.".format(cR+str(monoCount)+cW, cG+image+cW))
+            elif int(monoCount) <= int(rgbCount):
+                print("\n* RESULTS: '{}' Dirty Word(s) found in image: '{}'.".format(cR+str(rgbCount)+cW, cG+image+cW))
+        except:
+            continue
+
+    ## Program End
+    print("\n\n----------: SCANS COMPLETE :----------")
+    input("\n* Press 'Enter' to exit Tesseract OCR...")
+
+## Yeet.
+if __name__ == '__main__':
+    main()
